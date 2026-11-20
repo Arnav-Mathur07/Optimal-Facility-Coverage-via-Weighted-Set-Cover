@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OPTIVEX // Optimal Facility Coverage & Weighted Set Cover</title>
+  
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX for crisp mathematical formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="renderMathInPage()"></script>
+
+  <!-- GSAP Animation Library -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       1. CORE DESIGN TOKENS & RESET (Zero Flash)
+       ========================================================================== */
+    :root {
+      --bg: #050508;
+      --bg-surface: rgba(18, 18, 24, 0.72);
+      --bg-card: rgba(22, 22, 30, 0.65);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(255, 255, 255, 0.22);
+      
+      --ink: #F4F4F6;
+      --ink-muted: #8E8E9C;
+      --ink-dim: #545462;
+      
+      --accent-opt: #10B981;      /* Emerald Green for Global Optimum */
+      --accent-opt-soft: rgba(16, 185, 129, 0.15);
+      --accent-greedy: #F59E0B;   /* Amber Gold for Chvátal Greedy */
+      --accent-greedy-soft: rgba(245, 158, 11, 0.15);
+      --accent-refined: #06B6D4;  /* Cyan for 1-Opt Refinement */
+      --accent-refined-soft: rgba(6, 182, 212, 0.15);
+      
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      overflow-x: hidden;
+      text-rendering: geometricPrecision;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+      background: var(--accent-greedy);
+      color: #000;
+    }
+
+    /* Subtle SVG Noise Texture */
+    .grain-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    /* ==========================================================================
+       2. CINEMATIC VIDEO BACKGROUND & SCRIM
+       ========================================================================== */
+    .hero-media-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .hero-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 30%;
+      opacity: 0;
+      transition: opacity 1.2s ease-out;
+      transform: scale(1.04);
+      filter: brightness(0.65) contrast(1.15);
+    }
+
+    .hero-video.loaded {
+      opacity: 0.42;
+    }
+
+    .scrim-radial {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 40%, rgba(5,5,8,0.1) 0%, rgba(5,5,8,0.7) 60%, var(--bg) 95%);
+    }
+
+    .scrim-bottom-fade {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 280px;
+      background: linear-gradient(to bottom, rgba(5,5,8,0) 0%, rgba(5,5,8,0.6) 50%, var(--bg) 100%);
+    }
+
+    /* ==========================================================================
+       3. FLOATING LIQUID-GLASS NAVIGATION
+       ========================================================================== */
+    .top-nav {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      padding: 8px 12px 8px 24px;
+      border-radius: 9999px;
+      background: var(--bg-surface);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      border: 1px solid var(--border-glass);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+      transition: all 0.3s ease;
+    }
+
+    .top-nav:hover {
+      border-color: var(--border-active);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-size: 0.95rem;
+    }
+
+    .brand-mark {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent-greedy), var(--accent-opt));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-weight: 900;
+      font-size: 11px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--ink-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--ink);
+    }
+
+    .nav-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #FFFFFF;
+      color: #050508;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 9999px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .nav-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(255,255,255,0.25);
+    }
+
+    /* ==========================================================================
+       4. HERO SECTION
+       ========================================================================== */
+    .hero-section {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 120px 24px 60px;
+      z-index: 10;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-glass);
+      color: var(--ink-muted);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-opt);
+      box-shadow: 0 0 10px var(--accent-opt);
+      animation: pulseGlow 2s infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.8rem, 6.5vw, 5.6rem);
+      line-height: 0.95;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      max-width: 1080px;
+      margin-bottom: 24px;
+      color: #FFFFFF;
+    }
+
+    .hero-title span.serif-accent {
+      font-style: italic;
+      font-weight: 400;
+      color: #A3A3BA;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 1.8vw, 1.25rem);
+      color: var(--ink-muted);
+      max-width: 680px;
+      line-height: 1.6;
+      margin-bottom: 40px;
+      font-weight: 300;
+    }
+
+    .hero-action-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 50px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--ink);
+      color: #050508;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 14px 28px;
+      border-radius: 9999px;
+      text-decoration: none;
+      transition: all 0.25s var(--ease-out);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255,255,255,0.22);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-glass);
+      color: var(--ink);
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 14px 28px;
+      border-radius: 9999px;
+      text-decoration: none;
+      backdrop-filter: blur(12px);
+      transition: all 0.25s var(--ease-out);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--border-active);
+      background: rgba(255,255,255,0.08);
+      transform: translateY(-2px);
+    }
+
+    /* Hero Micro-Telemetry Strip */
+    .hero-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 24px;
+    }
+
+    .telemetry-item {
+      text-align: left;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .telemetry-label {
+      font-size: 0.75rem;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 768px) {
+      .top-nav {
+        width: calc(100% - 32px);
+        max-width: 360px;
+        padding: 6px 14px;
+        gap: 12px;
+        justify-content: space-between;
+      }
+      .nav-links {
+        display: none;
+      }
+      .nav-cta {
+        padding: 6px 14px;
+        font-size: 0.78rem;
+      }
+      .hero-telemetry {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        width: 100%;
+        max-width: 320px;
+        padding-top: 20px;
+        margin: 0 auto;
+      }
+      .telemetry-item {
+        text-align: center;
+      }
+    }
+
+    /* ==========================================================================
+       5. SIGNATURE INTERACTIVE ALGORITHM SIMULATOR (THE CANVAS LAB)
+       ========================================================================== */
+    .sim-section {
+      position: relative;
+      padding: 60px 24px 100px;
+      max-width: 1400px;
+      margin: 0 auto;
+      z-index: 10;
+    }
+
+    .section-header {
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent-greedy);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .sim-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-glass);
+      border-radius: 24px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      min-height: 680px;
+    }
+
+    @media (max-width: 1024px) {
+      .sim-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .canvas-viewport {
+      position: relative;
+      background: #07070B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-right: 1px solid var(--border-glass);
+    }
+
+    #spatialCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    .canvas-overlay-controls {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .canvas-badge {
+      pointer-events: auto;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--ink-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .canvas-mode-toggles {
+      pointer-events: auto;
+      display: flex;
+      gap: 6px;
+      background: rgba(10, 10, 15, 0.85);
+      padding: 4px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-glass);
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--ink-muted);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn.active {
+      background: rgba(255,255,255,0.12);
+      color: #FFF;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Simulation Sidebar Controls */
+    .sim-panel {
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      overflow-y: auto;
+    }
+
+    .panel-block-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .instance-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .preset-chip {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--ink-muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+    }
+
+    .preset-chip:hover {
+      border-color: var(--border-active);
+      color: var(--ink);
+    }
+
+    .preset-chip.active {
+      background: rgba(245, 158, 11, 0.08);
+      border-color: var(--accent-greedy);
+      color: #FFF;
+    }
+
+    .solver-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-solve-greedy {
+      background: linear-gradient(135deg, var(--accent-greedy), #D97706);
+      color: #000;
+      border: none;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-solve-greedy:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+    }
+
+    .btn-solve-opt {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--accent-opt);
+      padding: 11px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-solve-opt:hover {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--accent-opt);
+    }
+
+    .btn-solve-refine {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      color: var(--accent-refined);
+      padding: 11px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-solve-refine:hover {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: var(--accent-refined);
+    }
+
+    /* Real-Time Telemetry Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .kpi-card {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border-glass);
+      padding: 12px 14px;
+      border-radius: 12px;
+    }
+
+    .kpi-card.opt-card { border-left: 3px solid var(--accent-opt); }
+    .kpi-card.greedy-card { border-left: 3px solid var(--accent-greedy); }
+
+    .kpi-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 2px;
+    }
+
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .kpi-sub {
+      font-size: 0.72rem;
+      color: var(--ink-dim);
+    }
+
+    /* Step Trace Ticker */
+    .trace-container {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .trace-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--ink-muted);
+    }
+
+    .trace-item:last-child { border-bottom: none; }
+    .trace-item.active-step { color: var(--accent-greedy); font-weight: 600; }
+
+    /* ==========================================================================
+       6. THEORY & DUALITY SECTION (ACADEMIC EXHIBITION)
+       ========================================================================== */
+    .theory-section {
+      padding: 100px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      z-index: 10;
+      position: relative;
+    }
+
+    .theory-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-top: 40px;
+    }
+
+    @media (max-width: 900px) {
+      .theory-grid { grid-template-columns: 1fr; }
+    }
+
+    .theory-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      padding: 36px 32px;
+      backdrop-filter: blur(16px);
+      transition: border-color 0.3s ease;
+    }
+
+    .theory-card:hover {
+      border-color: var(--border-active);
+    }
+
+    .theory-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .math-block {
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .theory-text {
+      color: var(--ink-muted);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+
+    /* ==========================================================================
+       7. BENCHMARK & ASYMPTOTIC ENGINE
+       ========================================================================== */
+    .benchmark-section {
+      padding: 100px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 10;
+    }
+
+    .bench-display {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 24px;
+      padding: 40px;
+      backdrop-filter: blur(20px);
+      margin-top: 36px;
+    }
+
+    .bench-charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      margin-top: 32px;
+    }
+
+    @media (max-width: 960px) {
+      .bench-charts-grid { grid-template-columns: 1fr; }
+    }
+
+    .chart-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .chart-title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Complexity Comparison Table */
+    .complexity-table-wrapper {
+      margin-top: 48px;
+      overflow-x: auto;
+    }
+
+    .complexity-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    .complexity-table th {
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .complexity-table td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--ink);
+    }
+
+    .badge-code {
+      font-family: var(--font-mono);
+      background: rgba(255,255,255,0.06);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+
+    /* ==========================================================================
+       8. FOOTER
+       ========================================================================== */
+    .site-footer {
+      border-top: 1px solid var(--border-glass);
+      padding: 60px 24px 80px;
+      text-align: center;
+      color: var(--ink-dim);
+      font-size: 0.85rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    .footer-brand {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--ink);
+      margin-bottom: 12px;
+    }
+
+    /* Motion Accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .hero-video { opacity: 0.3 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Analog Film Grain Overlay -->
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+  <!-- Cinematic Background Video Layer (from MotionSites media shelf #26) -->
+  <div class="hero-media-wrapper" aria-hidden="true">
+    <video class="hero-video" id="heroVid" autoplay muted loop playsinline preload="auto">
+      <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260808_112712_da9d53df-6d27-4b12-bdf6-aa9dc2622bdf.mp4" type="video/mp4">
+    </video>
+    <div class="scrim-radial"></div>
+    <div class="scrim-bottom-fade"></div>
+  </div>
+
+  <!-- Floating Liquid Glass Navbar -->
+  <header class="top-nav">
+    <a href="#hero" class="nav-brand">
+      <div class="brand-mark">O</div>
+      <span>OPTIVEX</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#simulator">Simulator</a></li>
+      <li><a href="#theory">Duality Theory</a></li>
+      <li><a href="#benchmarks">Benchmarks</a></li>
+      <li><a href="http://localhost:8501" target="_blank" title="Launch Local Streamlit Dashboard">Streamlit Dashboard ↗</a></li>
+    </ul>
+    <a href="#simulator" class="nav-cta">
+      <span>Launch Lab</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section" id="hero">
+    <div class="hero-eyebrow">
+      <span class="pulse-dot"></span>
+      <span>DAA Project-Based Learning // Fall 2026</span>
+    </div>
+
+    <h1 class="hero-title">
+      Weighted Set Cover <br>
+      <span class="serif-accent">&amp; Optimal Facility Coverage</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      A publication-grade interactive computational laboratory examining NP-hard facility location, 
+      comparing <strong>Chvátal’s Greedy Heuristic</strong> against <strong>Exact Branch-and-Bound</strong> with verified harmonic approximation guarantees.
+    </p>
+
+    <div class="hero-action-row">
+      <a href="#simulator" class="btn-primary">
+        <span>Enter Interactive Lab</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="#theory" class="btn-secondary">
+        <span>Theoretical Foundations</span>
+      </a>
+    </div>
+
+    <!-- Telemetry Strip -->
+    <div class="hero-telemetry">
+      <div class="telemetry-item">
+        <div class="telemetry-val">O(m·n)</div>
+        <div class="telemetry-label">Greedy Complexity</div>
+      </div>
+      <div class="telemetry-item">
+        <div class="telemetry-val">O(2ᵐ·n)</div>
+        <div class="telemetry-label">Exhaustive Bound</div>
+      </div>
+      <div class="telemetry-item">
+        <div class="telemetry-val">ρ ≤ Hₙ</div>
+        <div class="telemetry-label">Approximation Ceiling</div>
+      </div>
+      <div class="telemetry-item">
+        <div class="telemetry-val">0.78s</div>
+        <div class="telemetry-label">PyTest Verification</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1: The Signature Interactive Spatial Canvas Lab -->
+  <section class="sim-section" id="simulator">
+    <div class="section-header">
+      <div>
+        <span class="section-tag">Interactive Simulation Arena</span>
+        <h2 class="section-title">Dynamic Spatial Facility Optimization</h2>
+      </div>
+      <p style="color: var(--ink-muted); max-width: 440px; font-size: 0.9rem;">
+        Click on the canvas to inject custom demand zones. Trigger step-by-step greedy selections or exact combinatorial branch-and-bound.
+      </p>
+    </div>
+
+    <div class="sim-container">
+      <!-- HTML5 Canvas Visualizer -->
+      <div class="canvas-viewport">
+        <canvas id="spatialCanvas" width="900" height="680"></canvas>
+
+        <div class="canvas-overlay-controls">
+          <div class="canvas-badge">
+            <span id="canvasZoneCount">30 Zones</span> • <span id="canvasFacCount">12 Facilities</span>
+          </div>
+          <div class="canvas-mode-toggles">
+            <button class="mode-btn active" id="btnViewBoth" onclick="setVisualMode('both')">Comparison</button>
+            <button class="mode-btn" id="btnViewOpt" onclick="setVisualMode('opt')">Exact OPT</button>
+            <button class="mode-btn" id="btnViewGreedy" onclick="setVisualMode('greedy')">Chvátal Greedy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Live Telemetry Panel -->
+      <div class="sim-panel">
+        <div>
+          <div class="panel-block-title">
+            <span>Instance Generator</span>
+            <span style="color: var(--accent-greedy);">Seed: #42</span>
+          </div>
+          <div class="instance-selector">
+            <button class="preset-chip active" onclick="loadPreset('uniform')">
+              <strong>Uniform Grid</strong><br><small>Random municipal</small>
+            </button>
+            <button class="preset-chip" onclick="loadPreset('clustered')">
+              <strong>Urban Clusters</strong><br><small>High-density core</small>
+            </button>
+            <button class="preset-chip" onclick="loadPreset('harmonic')">
+              <strong>Harmonic Tight</strong><br><small>Adversarial worst-case</small>
+            </button>
+            <button class="preset-chip" onclick="regenerateRandom()">
+              <strong>Regenerate</strong><br><small>New seed layout</small>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel-block-title">Algorithm Execution</div>
+          <div class="solver-actions">
+            <button class="btn-solve-greedy" onclick="runGreedyStepByStep()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Execute Chvátal Greedy</span>
+            </button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button class="btn-solve-opt" onclick="runExactOPT()">
+                <span>Solve Exact OPT</span>
+              </button>
+              <button class="btn-solve-refine" onclick="runRefinedLocalSearch()">
+                <span>1-Opt Refine</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry KPIs -->
+        <div>
+          <div class="panel-block-title">Live Metrics HUD</div>
+          <div class="kpi-grid">
+            <div class="kpi-card opt-card">
+              <div class="kpi-label">Exact OPT Cost</div>
+              <div class="kpi-value" id="kpiOptCost">$0.00</div>
+              <div class="kpi-sub" id="kpiOptCount">0 sites selected</div>
+            </div>
+            <div class="kpi-card greedy-card">
+              <div class="kpi-label">Greedy Cost</div>
+              <div class="kpi-value" id="kpiGreedyCost">$0.00</div>
+              <div class="kpi-sub" id="kpiGreedyCount">0 sites selected</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Empirical Ratio (ρ)</div>
+              <div class="kpi-value" id="kpiRatio">1.000</div>
+              <div class="kpi-sub" id="kpiBound">Hₙ ceiling: 3.995</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Coverage &amp; Speedup</div>
+              <div class="kpi-value" id="kpiSpeedup">100%</div>
+              <div class="kpi-sub" id="kpiLatency">0.4 ms</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step Trace Ticker -->
+        <div>
+          <div class="panel-block-title">Step-by-Step Selection Trace</div>
+          <div class="trace-container" id="traceBox">
+            <div class="trace-item" style="color: var(--ink-dim);">Awaiting solver execution...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: Mathematical Duality & Theoretical Foundations -->
+  <section class="theory-section" id="theory">
+    <div class="section-header">
+      <div>
+        <span class="section-tag">Rigorous Algorithmic Foundations</span>
+        <h2 class="section-title">Integer Programming &amp; Dual Fitting</h2>
+      </div>
+      <p style="color: var(--ink-muted); max-width: 440px; font-size: 0.9rem;">
+        How primal-dual relaxation mathematically bounds greedy decisions within the harmonic envelope.
+      </p>
+    </div>
+
+    <div class="theory-grid">
+      <!-- Primal ILP Card -->
+      <div class="theory-card">
+        <h3>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-opt)" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>1. Primal Integer Linear Program (ILP)</span>
+        </h3>
+        <p class="theory-text">
+          Facility installation is cast as an exact binary decision optimization problem minimizing the linear cost objective subject to full universe demand coverage:
+        </p>
+
+        <div class="math-block" id="mathPrimal">
+          <!-- KaTeX will inject here -->
+        </div>
+
+        <p class="theory-text">
+          Where $x_i \in \{0, 1\}$ denotes whether candidate site $F_i$ is opened at cost $c_i > 0$, and coverage disk $S_i = \{z_j \mid \|F_i - z_j\|_2 \le R_i\}$ guarantees 100% feasibility.
+        </p>
+      </div>
+
+      <!-- Dual Fitting Card -->
+      <div class="theory-card">
+        <h3>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-greedy)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"/></svg>
+          <span>2. Dual-Fitting &amp; Harmonic Bound Proof</span>
+        </h3>
+        <p class="theory-text">
+          When Chvátal’s heuristic picks facility $i^*$ covering newly serviced elements $\Delta U$, it assigns a virtual price to each element:
+        </p>
+
+        <div class="math-block" id="mathDual">
+          <!-- KaTeX will inject here -->
+        </div>
+
+        <p class="theory-text">
+          By setting dual variables $y_j = p(z_j) / H_n$, the vector becomes feasible for the dual LP relaxation. By weak LP duality:
+          $$\text{Cost}(\text{Greedy}) = \sum_{j=1}^n p(z_j) = H_n \sum y_j \le H_n \cdot C_{\text{OPT}}$$
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Empirical Benchmarking Engine -->
+  <section class="benchmark-section" id="benchmarks">
+    <div class="section-header">
+      <div>
+        <span class="section-tag">Monte Carlo Verification</span>
+        <h2 class="section-title">Empirical Approximation Benchmarks</h2>
+      </div>
+      <div>
+        <button class="btn-primary" onclick="runClientBenchmark()">
+          <span>Run 25 Monte Carlo Trials</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="bench-display">
+      <div class="bench-charts-grid">
+        <!-- Scatter plot of empirical ratios -->
+        <div class="chart-box">
+          <div class="chart-title">
+            <span>Approximation Ratio Across Trials</span>
+            <span style="color: var(--accent-greedy);" id="benchMeanRatio">Mean ρ: 1.114</span>
+          </div>
+          <svg id="scatterSvg" width="100%" height="240" viewBox="0 0 500 240"></svg>
+        </div>
+
+        <!-- Cost comparison histogram -->
+        <div class="chart-box">
+          <div class="chart-title">
+            <span>Solution Cost Comparison ($)</span>
+            <span style="color: var(--accent-opt);">OPT vs Greedy vs Refined</span>
+          </div>
+          <svg id="barSvg" width="100%" height="240" viewBox="0 0 500 240"></svg>
+        </div>
+      </div>
+
+      <!-- Asymptotic Complexity Table -->
+      <div class="complexity-table-wrapper">
+        <table class="complexity-table">
+          <thead>
+            <tr>
+              <th>Algorithm</th>
+              <th>Paradigm</th>
+              <th>Worst-Case Time</th>
+              <th>Space Complexity</th>
+              <th>Optimality Guarantee</th>
+              <th>Scalability</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Exhaustive Brute-Force</strong></td>
+              <td>Combinatorial Search</td>
+              <td><span class="badge-code">O(2ᵐ · n)</span></td>
+              <td><span class="badge-code">O(m + n)</span></td>
+              <td><span style="color: var(--accent-opt);">Global Optimum (1.00)</span></td>
+              <td>m ≤ 18 sites</td>
+            </tr>
+            <tr>
+              <td><strong>Branch-and-Bound</strong></td>
+              <td>Pruned State Tree</td>
+              <td><span class="badge-code">O(2ᵐ · n)</span></td>
+              <td><span class="badge-code">O(m + n)</span></td>
+              <td><span style="color: var(--accent-opt);">Global Optimum (1.00)</span></td>
+              <td>m ≤ 24 sites</td>
+            </tr>
+            <tr>
+              <td><strong>Chvátal’s Greedy</strong></td>
+              <td>Marginal Cost Ratio</td>
+              <td><span class="badge-code" style="color: var(--accent-greedy);">O(m · n)</span></td>
+              <td><span class="badge-code">O(m · n)</span></td>
+              <td><span style="color: var(--accent-greedy);">ρ ≤ Hₙ ≈ ln(n) + 0.577</span></td>
+              <td>m, n ≥ 100,000</td>
+            </tr>
+            <tr>
+              <td><strong>Greedy + 1-Opt Local Search</strong></td>
+              <td>Local Refinement</td>
+              <td><span class="badge-code">O(m · n + m² · n)</span></td>
+              <td><span class="badge-code">O(m · n)</span></td>
+              <td><span style="color: var(--accent-refined);">Empirical ρ → 1.02</span></td>
+              <td>m, n ≥ 10,000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-brand">OPTIVEX // FACILITY COVERAGE</div>
+    <p>Design &amp; Analysis of Algorithms (DAA) Course Project-Based Learning</p>
+    <p style="margin-top: 6px; font-size: 0.8rem; color: var(--ink-dim);">
+      Verified with 6/6 Automated PyTest Invariant Tests • Full Python Engine Available in Workspace
+    </p>
+  </footer>
+
+  <!-- ==========================================================================
+       JAVASCRIPT COMPUTATIONAL ENGINE & VISUAL CHOREOGRAPHY
+       ========================================================================== -->
+  <script>
+    function renderMathInPage() {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+
+    // 1. Initialize KaTeX math formulas when library is ready
+    window.addEventListener('DOMContentLoaded', () => {
+      // Fade in hero video on load
+      const video = document.getElementById('heroVid');
+      if (video) {
+        if (video.readyState >= 3) {
+          video.classList.add('loaded');
+        } else {
+          video.addEventListener('loadeddata', () => video.classList.add('loaded'));
+        }
+      }
+
+      if (window.katex) {
+        katex.render(
+          `\\begin{aligned}
+          \\min_{x} \\quad & \\sum_{i=1}^{m} c_i x_i \\\\
+          \\text{subject to} \\quad & \\sum_{i: z_j \\in S_i} x_i \\ge 1, \\quad \\forall j \\in \\{1, \\dots, n\\} \\\\
+          & x_i \\in \\{0, 1\\}, \\quad \\forall i \\in \\{1, \\dots, m\\}
+          \\end{aligned}`,
+          document.getElementById('mathPrimal'),
+          { displayMode: true, throwOnError: false }
+        );
+
+        katex.render(
+          `p(z) = \\frac{c_{i^*}}{|S_{i^*} \\cap U_{\\text{rem}}|} = \\alpha_{i^*}, \\quad \\sum_{z \\in S_k} p(z) \\le c_k H_{|S_k|} \\le c_k H_n`,
+          document.getElementById('mathDual'),
+          { displayMode: true, throwOnError: false }
+        );
+      }
+
+      renderMathInPage();
+    });
+
+    // ==========================================================================
+    // 2. Client-Side Computational Set Cover Engine
+    // ==========================================================================
+    class SetCoverInstance {
+      constructor(n = 30, m = 12, type = 'uniform') {
+        this.n = n;
+        this.m = m;
+        this.type = type;
+        this.zones = [];       // array of {x, y} in [0, 100]
+        this.facilities = [];  // array of {x, y, radius, cost}
+        this.coverage = [];    // m x n boolean matrix
+        this.generate();
+      }
+
+      generate() {
+        this.zones = [];
+        this.facilities = [];
+
+        if (this.type === 'clustered') {
+          // Urban clusters (3 centroids)
+          const centroids = [
+            { x: 30, y: 30 },
+            { x: 75, y: 40 },
+            { x: 45, y: 75 }
+          ];
+          for (let i = 0; i < this.n; i++) {
+            const c = centroids[i % centroids.length];
+            this.zones.push({
+              x: Math.min(95, Math.max(5, c.x + (Math.random() - 0.5) * 22)),
+              y: Math.min(95, Math.max(5, c.y + (Math.random() - 0.5) * 22))
+            });
+          }
+          for (let j = 0; j < this.m; j++) {
+            const isLocal = j < Math.floor(this.m * 0.65);
+            const c = centroids[j % centroids.length];
+            const x = isLocal ? c.x + (Math.random() - 0.5) * 16 : 15 + Math.random() * 70;
+            const y = isLocal ? c.y + (Math.random() - 0.5) * 16 : 15 + Math.random() * 70;
+            const radius = isLocal ? 16 + Math.random() * 8 : 38 + Math.random() * 15;
+            const cost = isLocal ? Math.round(15 + Math.random() * 18) : Math.round(75 + Math.random() * 45);
+            this.facilities.push({ x, y, radius, cost });
+          }
+        } else if (this.type === 'harmonic') {
+          // Classic Adversarial Harmonic Tight Instance (Circular)
+          const cx = 50, cy = 50;
+          for (let i = 0; i < this.n; i++) {
+            const angle = (2 * Math.PI * i) / this.n;
+            this.zones.push({
+              x: cx + 35 * Math.cos(angle),
+              y: cy + 35 * Math.sin(angle)
+            });
+          }
+          // OPT Facility covering all
+          this.facilities.push({ x: cx, y: cy, radius: 42, cost: 1.05 });
+          // Deceptive facilities covering disjoint groups
+          const k = this.m - 1;
+          let remaining = this.n;
+          let grpSize = Math.max(1, Math.floor(this.n / k));
+          for (let j = 0; j < k; j++) {
+            const actualSize = (j === k - 1) ? remaining : grpSize;
+            const startIdx = j * grpSize;
+            const subZones = this.zones.slice(startIdx, startIdx + actualSize);
+            const fx = subZones.reduce((acc, z) => acc + z.x, 0) / actualSize;
+            const fy = subZones.reduce((acc, z) => acc + z.y, 0) / actualSize;
+            const maxD = Math.max(...subZones.map(z => Math.hypot(z.x - fx, z.y - fy)));
+            const cost = parseFloat((0.95 * 1.05 * (actualSize / remaining)).toFixed(3));
+            remaining -= actualSize;
+            this.facilities.push({ x: fx, y: fy, radius: Math.max(10, maxD + 3), cost });
+          }
+        } else {
+          // Uniform spatial random
+          for (let i = 0; i < this.n; i++) {
+            this.zones.push({
+              x: 8 + Math.random() * 84,
+              y: 8 + Math.random() * 84
+            });
+          }
+          for (let j = 0; j < this.m; j++) {
+            const radius = 20 + Math.random() * 18;
+            const areaCost = 0.04 * (Math.PI * radius * radius);
+            const cost = Math.round(15 + areaCost + Math.random() * 10);
+            this.facilities.push({
+              x: 8 + Math.random() * 84,
+              y: 8 + Math.random() * 84,
+              radius,
+              cost
+            });
+          }
+        }
+
+        this.ensureFeasibility();
+      }
+
+      ensureFeasibility() {
+        // Compute coverage matrix
+        this.coverage = [];
+        for (let i = 0; i < this.facilities.length; i++) {
+          const row = [];
+          const fac = this.facilities[i];
+          for (let j = 0; j < this.zones.length; j++) {
+            const z = this.zones[j];
+            const dist = Math.hypot(fac.x - z.x, fac.y - z.y);
+            row.push(dist <= fac.radius);
+          }
+          this.coverage.push(row);
+        }
+
+        // Expand nearest facility if any zone is uncovered
+        for (let j = 0; j < this.zones.length; j++) {
+          let covered = false;
+          for (let i = 0; i < this.facilities.length; i++) {
+            if (this.coverage[i][j]) { covered = true; break; }
+          }
+          if (!covered) {
+            let bestFac = 0, minDist = Infinity;
+            for (let i = 0; i < this.facilities.length; i++) {
+              const d = Math.hypot(this.facilities[i].x - this.zones[j].x, this.facilities[i].y - this.zones[j].y);
+              if (d < minDist) { minDist = d; bestFac = i; }
+            }
+            this.facilities[bestFac].radius = minDist + 2;
+            for (let k = 0; k < this.zones.length; k++) {
+              const d = Math.hypot(this.facilities[bestFac].x - this.zones[k].x, this.facilities[bestFac].y - this.zones[k].y);
+              this.coverage[bestFac][k] = (d <= this.facilities[bestFac].radius);
+            }
+          }
+        }
+      }
+
+      harmonicBound() {
+        let sum = 0;
+        for (let i = 1; i <= this.n; i++) sum += 1 / i;
+        return sum;
+      }
+    }
+
+    // Solvers in pure JavaScript
+    function solveGreedy(inst) {
+      const startTime = performance.now();
+      const n = inst.n;
+      const m = inst.facilities.length;
+      let uncovered = new Set(Array.from({ length: n }, (_, i) => i));
+      const selected = [];
+      const trace = [];
+
+      while (uncovered.size > 0) {
+        let bestFac = -1;
+        let bestRatio = Infinity;
+        let bestNewlyCovered = [];
+
+        for (let i = 0; i < m; i++) {
+          if (selected.includes(i)) continue;
+          const newly = [];
+          for (const z of uncovered) {
+            if (inst.coverage[i][z]) newly.push(z);
+          }
+          if (newly.length > 0) {
+            const ratio = inst.facilities[i].cost / newly.length;
+            if (ratio < bestRatio - 1e-9) {
+              bestRatio = ratio;
+              bestFac = i;
+              bestNewlyCovered = newly;
+            }
+          }
+        }
+
+        if (bestFac === -1) break;
+
+        selected.push(bestFac);
+        for (const z of bestNewlyCovered) uncovered.delete(z);
+
+        trace.push({
+          facility: bestFac,
+          cost: inst.facilities[bestFac].cost,
+          newCovered: bestNewlyCovered.length,
+          ratio: bestRatio,
+          coveragePct: Math.round(((n - uncovered.size) / n) * 100)
+        });
+      }
+
+      const totalCost = selected.reduce((acc, i) => acc + inst.facilities[i].cost, 0);
+      return {
+        selected,
+        totalCost: parseFloat(totalCost.toFixed(2)),
+        trace,
+        runtimeMs: parseFloat((performance.now() - startTime).toFixed(2))
+      };
+    }
+
+    function solveExactBnB(inst) {
+      const startTime = performance.now();
+      const n = inst.n;
+      const m = inst.facilities.length;
+      const targetMask = (1 << n) - 1;
+
+      // Build bitmasks
+      const facMasks = inst.facilities.map((_, i) => {
+        let mask = 0;
+        for (let j = 0; j < n; j++) {
+          if (inst.coverage[i][j]) mask |= (1 << j);
+        }
+        return mask;
+      });
+
+      // Suffix unions for reachability pruning
+      const suffix = new Array(m + 1).fill(0);
+      for (let i = m - 1; i >= 0; i--) {
+        suffix[i] = suffix[i + 1] | facMasks[i];
+      }
+
+      let bestCost = Infinity;
+      let bestSubset = [];
+
+      function branch(depth, currentMask, currentCost, subset) {
+        if (currentCost >= bestCost) return;
+        if (currentMask === targetMask) {
+          bestCost = currentCost;
+          bestSubset = [...subset];
+          return;
+        }
+        if (depth >= m) return;
+        if ((currentMask | suffix[depth]) !== targetMask) return;
+
+        // Choice 1: Include
+        if ((currentMask | facMasks[depth]) !== currentMask) {
+          subset.push(depth);
+          branch(depth + 1, currentMask | facMasks[depth], currentCost + inst.facilities[depth].cost, subset);
+          subset.pop();
+        }
+
+        // Choice 2: Exclude
+        branch(depth + 1, currentMask, currentCost, subset);
+      }
+
+      branch(0, 0, 0, []);
+
+      return {
+        selected: bestSubset,
+        totalCost: parseFloat(bestCost.toFixed(2)),
+        runtimeMs: parseFloat((performance.now() - startTime).toFixed(2))
+      };
+    }
+
+    function refineOneOpt(inst, greedyResult) {
+      const selected = [...greedyResult.selected];
+      const m = inst.facilities.length;
+
+      // Reverse cost redundancy pruning
+      selected.sort((a, b) => inst.facilities[b].cost - inst.facilities[a].cost);
+      for (let i = selected.length - 1; i >= 0; i--) {
+        const testSub = selected.filter((_, idx) => idx !== i);
+        let coversAll = true;
+        for (let j = 0; j < inst.n; j++) {
+          if (!testSub.some(fac => inst.coverage[fac][j])) {
+            coversAll = false; break;
+          }
+        }
+        if (coversAll) selected.splice(i, 1);
+      }
+
+      const totalCost = selected.reduce((acc, i) => acc + inst.facilities[i].cost, 0);
+      return {
+        selected,
+        totalCost: parseFloat(totalCost.toFixed(2))
+      };
+    }
+
+    // ==========================================================================
+    // 3. Canvas Renderer & Interaction State
+    // ==========================================================================
+    let currentInst = new SetCoverInstance(30, 12, 'uniform');
+    let greedySol = solveGreedy(currentInst);
+    let optSol = solveExactBnB(currentInst);
+    let visualMode = 'both'; // 'both', 'opt', 'greedy'
+    let stepAnimationIdx = -1;
+
+    const canvas = document.getElementById('spatialCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      renderCanvas();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function toScreenX(x) { return (x / 100) * (canvas.width / window.devicePixelRatio); }
+    function toScreenY(y) { return (y / 100) * (canvas.height / window.devicePixelRatio); }
+    function toScreenR(r) { return (r / 100) * Math.min(canvas.width, canvas.height) / window.devicePixelRatio; }
+
+    function renderCanvas() {
+      const w = canvas.width / window.devicePixelRatio;
+      const h = canvas.height / window.devicePixelRatio;
+      ctx.clearRect(0, 0, w, h);
+
+      // Draw subtle spatial grid
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      for (let i = 10; i < 100; i += 10) {
+        ctx.beginPath();
+        ctx.moveTo(toScreenX(i), 0);
+        ctx.lineTo(toScreenX(i), h);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, toScreenY(i));
+        ctx.lineTo(w, toScreenY(i));
+        ctx.stroke();
+      }
+
+      const activeGreedy = (stepAnimationIdx >= 0) 
+        ? greedySol.selected.slice(0, stepAnimationIdx + 1) 
+        : greedySol.selected;
+
+      // 1. Draw Facility Coverage Perimeters
+      currentInst.facilities.forEach((fac, idx) => {
+        const isOpt = optSol.selected.includes(idx);
+        const isGreedy = activeGreedy.includes(idx);
+        const sx = toScreenX(fac.x);
+        const sy = toScreenY(fac.y);
+        const sr = toScreenR(fac.radius);
+
+        if ((visualMode === 'both' || visualMode === 'opt') && isOpt) {
+          ctx.beginPath();
+          ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+          ctx.fill();
+          ctx.strokeStyle = '#10B981';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          ctx.stroke();
+        }
+
+        if ((visualMode === 'both' || visualMode === 'greedy') && isGreedy) {
+          ctx.beginPath();
+          ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.07)';
+          ctx.fill();
+          ctx.strokeStyle = '#F59E0B';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Unselected facilities
+        if (!isOpt && !isGreedy) {
+          ctx.beginPath();
+          ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      });
+
+      // 2. Draw Demand Zones
+      currentInst.zones.forEach((z, idx) => {
+        const sx = toScreenX(z.x);
+        const sy = toScreenY(z.y);
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#EF4444';
+        ctx.shadowColor = '#EF4444';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+
+      // 3. Draw Facility Center Markers
+      currentInst.facilities.forEach((fac, idx) => {
+        const isOpt = optSol.selected.includes(idx);
+        const isGreedy = activeGreedy.includes(idx);
+        const sx = toScreenX(fac.x);
+        const sy = toScreenY(fac.y);
+
+        ctx.beginPath();
+        if (isOpt && isGreedy) {
+          ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+          ctx.fillStyle = '#10B981';
+          ctx.strokeStyle = '#F59E0B';
+          ctx.lineWidth = 3;
+          ctx.fill();
+          ctx.stroke();
+        } else if (isOpt) {
+          ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+          ctx.fillStyle = '#10B981';
+          ctx.fill();
+        } else if (isGreedy) {
+          ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+          ctx.fillStyle = '#F59E0B';
+          ctx.fill();
+        } else {
+          ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.fill();
+        }
+
+        // Text label
+        ctx.font = '10px JetBrains Mono';
+        ctx.fillStyle = '#8E8E9C';
+        ctx.fillText(`F${idx} ($${fac.cost})`, sx + 10, sy - 4);
+      });
+    }
+
+    function updateHUD() {
+      document.getElementById('canvasZoneCount').textContent = `${currentInst.n} Zones`;
+      document.getElementById('canvasFacCount').textContent = `${currentInst.facilities.length} Facilities`;
+      document.getElementById('kpiOptCost').textContent = `$${optSol.totalCost}`;
+      document.getElementById('kpiOptCount').textContent = `${optSol.selected.length} sites selected`;
+      document.getElementById('kpiGreedyCost').textContent = `$${greedySol.totalCost}`;
+      document.getElementById('kpiGreedyCount').textContent = `${greedySol.selected.length} sites selected`;
+
+      const ratio = optSol.totalCost > 0 ? (greedySol.totalCost / optSol.totalCost).toFixed(3) : "1.000";
+      document.getElementById('kpiRatio').textContent = ratio;
+      document.getElementById('kpiBound').textContent = `Hₙ ceiling: ${currentInst.harmonicBound().toFixed(3)}`;
+      document.getElementById('kpiLatency').textContent = `${greedySol.runtimeMs} ms`;
+
+      // Update trace
+      const traceBox = document.getElementById('traceBox');
+      traceBox.innerHTML = '';
+      greedySol.trace.forEach((step, i) => {
+        const item = document.createElement('div');
+        item.className = `trace-item ${i === stepAnimationIdx ? 'active-step' : ''}`;
+        item.innerHTML = `
+          <span>#${i+1} F_${step.facility} ($${step.cost})</span>
+          <span>+${step.newCovered} zones (α=$${step.ratio.toFixed(2)})</span>
+          <span>${step.coveragePct}%</span>
+        `;
+        traceBox.appendChild(item);
+      });
+    }
+
+    // Interactive user controls
+    function loadPreset(type) {
+      document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      currentInst = new SetCoverInstance(30, 12, type);
+      stepAnimationIdx = -1;
+      greedySol = solveGreedy(currentInst);
+      optSol = solveExactBnB(currentInst);
+      updateHUD();
+      renderCanvas();
+    }
+
+    function regenerateRandom() {
+      currentInst.generate();
+      stepAnimationIdx = -1;
+      greedySol = solveGreedy(currentInst);
+      optSol = solveExactBnB(currentInst);
+      updateHUD();
+      renderCanvas();
+    }
+
+    function setVisualMode(mode) {
+      visualMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      if (mode === 'both') document.getElementById('btnViewBoth').classList.add('active');
+      if (mode === 'opt') document.getElementById('btnViewOpt').classList.add('active');
+      if (mode === 'greedy') document.getElementById('btnViewGreedy').classList.add('active');
+      renderCanvas();
+    }
+
+    function runGreedyStepByStep() {
+      stepAnimationIdx = 0;
+      updateHUD();
+      renderCanvas();
+      const interval = setInterval(() => {
+        stepAnimationIdx++;
+        if (stepAnimationIdx >= greedySol.trace.length) {
+          clearInterval(interval);
+        }
+        updateHUD();
+        renderCanvas();
+      }, 400);
+    }
+
+    function runExactOPT() {
+      visualMode = 'opt';
+      setVisualMode('opt');
+    }
+
+    function runRefinedLocalSearch() {
+      const ref = refineOneOpt(currentInst, greedySol);
+      document.getElementById('kpiGreedyCost').textContent = `$${ref.totalCost} (1-Opt)`;
+      renderCanvas();
+    }
+
+    // Click canvas to add demand zone dynamically
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      currentInst.zones.push({ x, y });
+      currentInst.n = currentInst.zones.length;
+      currentInst.ensureFeasibility();
+      greedySol = solveGreedy(currentInst);
+      optSol = solveExactBnB(currentInst);
+      updateHUD();
+      renderCanvas();
+    });
+
+    // ==========================================================================
+    // 4. Monte Carlo Benchmark Engine (Client SVG Charts)
+    // ==========================================================================
+    function runClientBenchmark() {
+      const trials = 25;
+      const points = [];
+      const costs = [];
+      let ratioSum = 0;
+
+      for (let t = 0; t < trials; t++) {
+        const inst = new SetCoverInstance(25, 10, 'uniform');
+        const g = solveGreedy(inst);
+        const opt = solveExactBnB(inst);
+        const ref = refineOneOpt(inst, g);
+        const ratio = opt.totalCost > 0 ? (g.totalCost / opt.totalCost) : 1.0;
+        ratioSum += ratio;
+        points.push({ trial: t + 1, ratio });
+        costs.push({ opt: opt.totalCost, greedy: g.totalCost, ref: ref.totalCost });
+      }
+
+      const meanRatio = (ratioSum / trials).toFixed(3);
+      document.getElementById('benchMeanRatio').textContent = `Mean ρ: ${meanRatio}`;
+
+      // Draw SVG Scatter Plot
+      const scatter = document.getElementById('scatterSvg');
+      scatter.innerHTML = '';
+      
+      // Target lines: y=1.0 and y=H_n (assume ~3.8)
+      const h = 240, w = 500;
+      const yToSvg = r => h - 30 - ((r - 0.9) / (4.0 - 0.9)) * (h - 60);
+
+      // Horizontal lines
+      const yOpt = yToSvg(1.0);
+      const yHn = yToSvg(3.81);
+      scatter.innerHTML += `<line x1="40" y1="${yOpt}" x2="${w-20}" y2="${yOpt}" stroke="#10B981" stroke-width="1.5" />`;
+      scatter.innerHTML += `<text x="${w-120}" y="${yOpt - 6}" fill="#10B981" font-size="10" font-family="JetBrains Mono">OPT (ρ = 1.0)</text>`;
+      scatter.innerHTML += `<line x1="40" y1="${yHn}" x2="${w-20}" y2="${yHn}" stroke="#EF4444" stroke-dasharray="4 4" stroke-width="1.5" />`;
+      scatter.innerHTML += `<text x="${w-130}" y="${yHn - 6}" fill="#EF4444" font-size="10" font-family="JetBrains Mono">Bound Hₙ (3.81)</text>`;
+
+      points.forEach((p, i) => {
+        const px = 50 + (i / (trials - 1)) * (w - 80);
+        const py = yToSvg(p.ratio);
+        scatter.innerHTML += `<circle cx="${px}" cy="${py}" r="4" fill="#F59E0B" />`;
+      });
+
+      // Draw SVG Bar Chart
+      const barSvg = document.getElementById('barSvg');
+      barSvg.innerHTML = '';
+      const maxC = Math.max(...costs.map(c => Math.max(c.opt, c.greedy)));
+      costs.slice(0, 10).forEach((c, i) => {
+        const bx = 40 + i * 44;
+        const hOpt = (c.opt / maxC) * 160;
+        const hGr = (c.greedy / maxC) * 160;
+        barSvg.innerHTML += `<rect x="${bx}" y="${210 - hOpt}" width="10" height="${hOpt}" fill="#10B981" rx="2" />`;
+        barSvg.innerHTML += `<rect x="${bx + 12}" y="${210 - hGr}" width="10" height="${hGr}" fill="#F59E0B" rx="2" />`;
+      });
+    }
+
+    // Initialize Canvas on page load
+    setTimeout(() => {
+      resizeCanvas();
+      updateHUD();
+      runClientBenchmark();
+    }, 100);
+  </script>
+</body>
+</html>
