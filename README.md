@@ -124,61 +124,67 @@ $$
 $$
 
 #### Proof by Dual Fitting:
-1. **Price Accounting:** Suppose at step $t$, the greedy algorithm selects facility $i^\star$ covering newly serviced elements $`\Delta U = S_{i^\star} \cap U_{\mathrm{rem}}`$. We charge each newly covered element $`z_j \in \Delta U`$ an equal price:
 
-   $$
-   p(z_j) = \frac{c_{i^\star}}{|\Delta U|}
-   $$
+#### Step 1 — Price Accounting
+Suppose at step $t$, the greedy algorithm selects facility $i^\star$ covering newly serviced elements $`\Delta U = S_{i^\star} \cap U_{\mathrm{rem}}`$. We charge each newly covered element $`z_j \in \Delta U`$ an equal price:
 
-2. **Total Cost Equality:** By construction, the sum of prices charged to all elements equals the total cost incurred by the greedy algorithm:
+$$
+p(z_j) = \frac{c_{i^\star}}{|\Delta U|}
+$$
 
-   $$
-   \text{Cost}(\text{Greedy}) = \sum_{i \in I_{\text{Greedy}}} c_i = \sum_{j=1}^n p(z_j)
-   $$
+#### Step 2 — Total Cost Equality
+By construction, the sum of prices charged to all elements equals the total cost incurred by the greedy algorithm:
 
-3. **Bounding the Price on Any Set:** Consider any arbitrary candidate facility $`S_k \in \mathcal{S}`$ containing $`|S_k|`$ elements. Order the elements of $`S_k`$ in the sequence they were covered by the greedy algorithm: $`e_1, e_2, \dots, e_{|S_k|}`$.  
-   When element $`e_r`$ was covered, at least $`|S_k| - r + 1`$ elements of $`S_k`$ were still uncovered.  
-   Since the greedy rule picked the facility with the minimal marginal cost ratio, the price charged to $`e_r`$ was at most:
+$$
+\text{Cost}(\text{Greedy}) = \sum_{i \in I_{\text{Greedy}}} c_i = \sum_{j=1}^n p(z_j)
+$$
 
-   $$
-   p(e_r) \le \frac{c_k}{|S_k| - r + 1}
-   $$
+#### Step 3 — Bounding the Price on Any Set
+Consider any arbitrary candidate facility $`S_k \in \mathcal{S}`$ containing $`|S_k|`$ elements. Order the elements of $`S_k`$ in the sequence they were covered by the greedy algorithm: $`e_1, e_2, \dots, e_{|S_k|}`$.  
+When element $`e_r`$ was covered, at least $`|S_k| - r + 1`$ elements of $`S_k`$ were still uncovered.  
+Since the greedy rule picked the facility with the minimal marginal cost ratio, the price charged to $`e_r`$ was at most:
 
-   Summing over all elements in $`S_k`$:
+$$
+p(e_r) \le \frac{c_k}{|S_k| - r + 1}
+$$
 
-   $$
-   \sum_{z \in S_k} p(z) \le \sum_{r=1}^{|S_k|} \frac{c_k}{|S_k| - r + 1} = c_k \sum_{\ell=1}^{|S_k|} \frac{1}{\ell} = c_k H_{|S_k|} \le c_k H_n
-   $$
+Summing over all elements in $`S_k`$:
 
-4. **Constructing a Feasible Dual Vector:** Divide every price by $H_n$:
+$$
+\sum_{z \in S_k} p(z) \le \sum_{r=1}^{|S_k|} \frac{c_k}{|S_k| - r + 1} = c_k \sum_{\ell=1}^{|S_k|} \frac{1}{\ell} = c_k H_{|S_k|} \le c_k H_n
+$$
 
-   $$
-   y_j = \frac{p(z_j)}{H_n}
-   $$
+#### Step 4 — Constructing a Feasible Dual Vector
+Divide every price by $H_n$:
 
-   Then for every facility $`S_k`$:
+$$
+y_j = \frac{p(z_j)}{H_n}
+$$
 
-   $$
-   \sum_{z \in S_k} y_j = \frac{1}{H_n} \sum_{z \in S_k} p(z) \le \frac{c_k H_n}{H_n} = c_k
-   $$
+Then for every facility $`S_k`$:
 
-   Thus, the vector $y$ is strictly feasible for the Dual Linear Program!
+$$
+\sum_{z \in S_k} y_j = \frac{1}{H_n} \sum_{z \in S_k} p(z) \le \frac{c_k H_n}{H_n} = c_k
+$$
 
-5. **Invoking Weak LP Duality:** By weak duality, any feasible dual solution provides a lower bound on the optimal primal LP relaxation objective ($`C_{\text{LP}} \le C_{\text{OPT}}`$):
+Thus, the vector $y$ is strictly feasible for the Dual Linear Program!
 
-   $$
-   \sum_{j=1}^n y_j \le C_{\text{LP}} \le C_{\text{OPT}}
-   $$
+#### Step 5 — Invoking Weak LP Duality
+By weak duality, any feasible dual solution provides a lower bound on the optimal primal LP relaxation objective ($`C_{\text{LP}} \le C_{\text{OPT}}`$):
 
-   Multiplying by $H_n$:
+$$
+\sum_{j=1}^n y_j \le C_{\text{LP}} \le C_{\text{OPT}}
+$$
 
-   $$
-   \text{Cost}(\text{Greedy}) = \sum_{j=1}^n p(z_j) = H_n \sum_{j=1}^n y_j \le H_n \cdot C_{\text{OPT}}
-   $$
+Multiplying by $H_n$:
 
-   $$
-   \rho = \frac{\text{Cost}(\text{Greedy})}{C_{\text{OPT}}} \le H_n \quad \blacksquare
-   $$
+$$
+\text{Cost}(\text{Greedy}) = \sum_{j=1}^n p(z_j) = H_n \sum_{j=1}^n y_j \le H_n \cdot C_{\text{OPT}}
+$$
+
+$$
+\rho = \frac{\text{Cost}(\text{Greedy})}{C_{\text{OPT}}} \le H_n \quad \blacksquare
+$$
 
 ---
 
@@ -279,11 +285,11 @@ daa-facility-approx-dashboard/
 #### 2. `src/generator.py`
 * **Feasibility Guarantee (`_ensure_full_coverage`)**: If any random placement leaves a demand zone uncovered, the engine computes Euclidean distances to all facilities, locates the closest facility $F_{i^\star}$, and automatically increases its radius:
 
-  $$
-  R_{i^\star} \leftarrow \mathrm{dist}(F_{i^\star}, z_j) + 1.5
-  $$
+$$
+R_{i^\star} \leftarrow \mathrm{dist}(F_{i^\star}, z_j) + 1.5
+$$
 
-  and adjusts its cost proportional to the expanded area. This guarantees $\bigcup S_i = U$ on 100% of generated instances.
+and adjusts its cost proportional to the expanded area. This guarantees $\bigcup S_i = U$ on 100% of generated instances.
 * **Three Generator Modes:**
   1. *Uniform Random Spatial:* Uniformly distributes zones and facilities on $[0, 100] \times [0, 100]$ with cost function $c_i = 15 + 0.04 \pi R_i^2 + \text{noise}$.
   2. *Clustered Urban Hotspots:* Generates Gaussian clusters around 3 city centroids with two facility tiers: 65% local clinics ($R \in [14, 24]$, cost $\$15-\$35$) and 35% regional medical centers ($R \in [38, 55]$, cost $\$75-\$130$).
@@ -297,11 +303,11 @@ daa-facility-approx-dashboard/
 #### 4. `src/approx_solver.py`
 * **Chvátal's Greedy Solver:** Iteratively tracks uncovered demand zones $U_{\mathrm{rem}}$. In each step, evaluates candidate facilities and selects:
 
-  $$
-  i^\star = \arg\min_{i \notin I} \frac{c_i}{|S_i \cap U_{\mathrm{rem}}|}
-  $$
+$$
+i^\star = \arg\min_{i \notin I} \frac{c_i}{|S_i \cap U_{\mathrm{rem}}|}
+$$
 
-  Logs an interactive trace containing iteration number, selected facility, cost, newly covered count, marginal cost ratio $\alpha_i$, and cumulative coverage percentage.
+Logs an interactive trace containing iteration number, selected facility, cost, newly covered count, marginal cost ratio $\alpha_i$, and cumulative coverage percentage.
 * **Refined Greedy (1-Opt Post-Processing):**
   1. *Reverse-Cost Redundancy Pruning:* Sorts selected facilities in descending order of cost. If removing facility $f$ leaves coverage at 100%, $f$ is permanently discarded.
   2. *1-Swap Local Search:* Iterates over selected facilities $u \in I$ and unselected candidates $v \notin I$. If $c_v < c_u$ and $(I \setminus \{u\}) \cup \{v\}$ maintains 100% coverage, executes the swap.
@@ -488,13 +494,7 @@ pytest tests/test_solvers.py -v
 1. `test_feasibility_guarantee_uniform`: Proves 100% of demand zones are covered across uniform random instances.
 2. `test_feasibility_guarantee_clustered`: Proves feasibility across complex multi-tier urban clustered environments.
 3. `test_branch_and_bound_matches_exhaustive`: Verifies Branch-and-Bound produces the **exact same optimal cost** as brute-force enumeration while evaluating $\le$ states.
-4. `test_strict_optimality_invariant_50_instances`: Verifies the fundamental mathematical invariant:
-
-   $$
-   \text{cost}(\text{Greedy}) \ge \text{cost}(\text{Exact OPT}) \quad (\rho \ge 1.000)
-   $$
-
-   across 50 randomized instances with **zero violations**.
+4. `test_strict_optimality_invariant_50_instances`: Verifies the fundamental mathematical invariant: $`\text{cost}(\text{Greedy}) \ge \text{cost}(\text{Exact OPT})`$ ($`\rho \ge 1.000`$) across 50 randomized instances with **zero violations**.
 5. `test_adversarial_harmonic_worst_case`: Verifies that the adversarial generator forces greedy to yield $\rho > 1.30$ while strictly adhering to $\rho \le H_n + 10^{-6}$.
 6. `test_greedy_trace_integrity`: Verifies that cumulative coverage monotonically increases up to 100%.
 
