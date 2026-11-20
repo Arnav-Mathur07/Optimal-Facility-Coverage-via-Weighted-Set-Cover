@@ -98,8 +98,8 @@ $$\begin{aligned}
 $$\rho = \frac{\text{Cost}(\text{Greedy})}{C_{\text{OPT}}} \le H_n = \sum_{k=1}^n \frac{1}{k} \le \ln n + 1$$
 
 #### Proof by Dual Fitting:
-1. **Price Accounting:** Suppose at step $t$, the greedy algorithm selects facility $i^*$ covering newly serviced elements $\Delta U = S_{i^*} \cap U_{\text{rem}}$. We charge each newly covered element $z_j \in \Delta U$ an equal price:
-   $$p(z_j) = \frac{c_{i^*}}{|\Delta U|}$$
+1. **Price Accounting:** Suppose at step $t$, the greedy algorithm selects facility $i^\star$ covering newly serviced elements $\Delta U = S_{i^\star} \cap U_{\mathrm{rem}}$. We charge each newly covered element $z_j \in \Delta U$ an equal price:
+   $$p(z_j) = \frac{c_{i^\star}}{|\Delta U|}$$
 2. **Total Cost Equality:** By construction, the sum of prices charged to all elements equals the total cost incurred by the greedy algorithm:
    $$\text{Cost}(\text{Greedy}) = \sum_{i \in I_{\text{Greedy}}} c_i = \sum_{j=1}^n p(z_j)$$
 3. **Bounding the Price on Any Set:** Consider any arbitrary candidate facility $S_k \in \mathcal{S}$ containing $|S_k|$ elements. Order the elements of $S_k$ in the sequence they were covered by the greedy algorithm: $e_1, e_2, \dots, e_{|S_k|}$.  
@@ -113,8 +113,8 @@ $$\rho = \frac{\text{Cost}(\text{Greedy})}{C_{\text{OPT}}} \le H_n = \sum_{k=1}^
    Then for every facility $S_k$:
    $$\sum_{z \in S_k} y_j = \frac{1}{H_n} \sum_{z \in S_k} p(z) \le \frac{c_k H_n}{H_n} = c_k$$
    Thus, the vector $y$ is strictly feasible for the Dual Linear Program!
-5. **Invoking Weak LP Duality:** By weak duality, any feasible dual solution provides a lower bound on the optimal primal objective $C_{\text{OPT\_LP}} \le C_{\text{OPT}}$:
-   $$\sum_{j=1}^n y_j \le C_{\text{OPT\_LP}} \le C_{\text{OPT}}$$
+5. **Invoking Weak LP Duality:** By weak duality, any feasible dual solution provides a lower bound on the optimal primal LP relaxation objective ($C_{\text{LP}} \le C_{\text{OPT}}$):
+   $$\sum_{j=1}^n y_j \le C_{\text{LP}} \le C_{\text{OPT}}$$
    Multiplying by $H_n$:
    $$\text{Cost}(\text{Greedy}) = \sum_{j=1}^n p(z_j) = H_n \sum_{j=1}^n y_j \le H_n \cdot C_{\text{OPT}}$$
    $$\rho = \frac{\text{Cost}(\text{Greedy})}{C_{\text{OPT}}} \le H_n \quad \blacksquare$$
@@ -216,8 +216,8 @@ daa-facility-approx-dashboard/
 * **`BenchmarkRecord`**: Standardized tabular schema storing per-instance metrics ($C_{\text{OPT}}$, $C_{\text{Greedy}}$, $C_{\text{Refined}}$, empirical ratio $\rho$, speedup factor, states explored).
 
 #### 2. `src/generator.py`
-* **Feasibility Guarantee (`_ensure_full_coverage`)**: If any random placement leaves a demand zone uncovered, the engine computes Euclidean distances to all facilities, locates the closest facility $F_{i^*}$, and automatically increases its radius:
-  $$R_{i^*} \leftarrow \text{dist}(F_{i^*}, z_j) + 1.5$$
+* **Feasibility Guarantee (`_ensure_full_coverage`)**: If any random placement leaves a demand zone uncovered, the engine computes Euclidean distances to all facilities, locates the closest facility $F_{i^\star}$, and automatically increases its radius:
+  $$R_{i^\star} \leftarrow \mathrm{dist}(F_{i^\star}, z_j) + 1.5$$
   and adjusts its cost proportional to the expanded area. This guarantees $\bigcup S_i = U$ on 100% of generated instances.
 * **Three Generator Modes:**
   1. *Uniform Random Spatial:* Uniformly distributes zones and facilities on $[0, 100] \times [0, 100]$ with cost function $c_i = 15 + 0.04 \pi R_i^2 + \text{noise}$.
@@ -230,8 +230,8 @@ daa-facility-approx-dashboard/
 * **Branch-and-Bound (`solve_exact_bnb`):** Explores a binary state-space tree with 3 admissible pruning rules (detailed in Section 4.2).
 
 #### 4. `src/approx_solver.py`
-* **Chvátal's Greedy Solver:** Iteratively tracks uncovered demand zones $U_{\text{rem}}$. In each step, evaluates candidate facilities and selects:
-  $$i^* = \arg\min_{i \notin I} \frac{c_i}{|S_i \cap U_{\text{rem}}|}$$
+* **Chvátal's Greedy Solver:** Iteratively tracks uncovered demand zones $U_{\mathrm{rem}}$. In each step, evaluates candidate facilities and selects:
+  $$i^\star = \arg\min_{i \notin I} \frac{c_i}{|S_i \cap U_{\mathrm{rem}}|}$$
   Logs an interactive trace containing iteration number, selected facility, cost, newly covered count, marginal cost ratio $\alpha_i$, and cumulative coverage percentage.
 * **Refined Greedy (1-Opt Post-Processing):**
   1. *Reverse-Cost Redundancy Pruning:* Sorts selected facilities in descending order of cost. If removing facility $f$ leaves coverage at 100%, $f$ is permanently discarded.
@@ -267,12 +267,12 @@ Branch-and-Bound organizes the search into a binary state-space tree where at de
 
 #### Dual Admissible Pruning Conditions:
 1. **Cost-Bound Pruning (Lower Bound):**  
-   If $\text{current\_cost} \ge \text{best\_cost}$, terminate the branch immediately. Because all facility costs are strictly positive ($c_i > 0$), adding more facilities can never decrease the cost.
+   If `current_cost >= best_cost`, terminate the branch immediately. Because all facility costs are strictly positive ($c_i > 0$), adding more facilities can never decrease the cost.
 2. **Reachability Pruning (Suffix Union):**  
-   Precompute suffix masks: $\text{suffix\_union}[d] = \bigcup_{i=d}^{m-1} S_i$.  
-   If $(\text{current\_mask} \mid \text{suffix\_union}[d]) \neq \text{target\_mask}$, then even if we select **every single remaining facility** from $d$ to $m-1$, the universe cannot be covered. Terminate the branch immediately!
+   Precompute suffix masks: `suffix_union[d]` $= \bigcup_{i=d}^{m-1} S_i$.  
+   If `(current_mask | suffix_union[d]) != target_mask`, then even if we select **every single remaining facility** from $d$ to $m-1$, the universe cannot be covered. Terminate the branch immediately!
 3. **Feasibility Termination:**  
-   Once $\text{current\_mask} == \text{target\_mask}$, update $\text{best\_cost} = \text{current\_cost}$ and prune deeper exploration.
+   Once `current_mask == target_mask`, update `best_cost = current_cost` and prune deeper exploration.
 
 *Result:* Evaluates **up to 95% fewer states** than brute-force while guaranteeing the exact same global optimum $C_{\text{OPT}}$.
 
@@ -447,9 +447,9 @@ A ratio of $\rho = 1.0$ indicates an exact optimal solution. If $\rho = 1.15$, t
 
 ### Q3: What is Chvátal's greedy selection rule?
 **Answer:**  
-"At each step $t$, let $U_{\text{rem}}$ be the set of currently uncovered demand zones. Chvátal’s algorithm selects the candidate facility $i^*$ that minimizes the marginal cost per newly covered zone:
-$$i^* = \arg\min_{i \notin I} \alpha_i = \arg\min_{i \notin I} \frac{c_i}{|S_i \cap U_{\text{rem}}|}$$
-It commits facility $i^*$, removes $S_{i^*}$ from $U_{\text{rem}}$, and repeats until $U_{\text{rem}} = \emptyset$."
+"At each step $t$, let $U_{\mathrm{rem}}$ be the set of currently uncovered demand zones. Chvátal’s algorithm selects the candidate facility $i^\star$ that minimizes the marginal cost per newly covered zone:
+$$i^\star = \arg\min_{i \notin I} \alpha_i = \arg\min_{i \notin I} \frac{c_i}{|S_i \cap U_{\mathrm{rem}}|}$$
+It commits facility $i^\star$, removes $S_{i^\star}$ from $U_{\mathrm{rem}}$, and repeats until $U_{\mathrm{rem}} = \emptyset$."
 
 ---
 
@@ -463,7 +463,7 @@ In 1979, Chvátal proved the upper bound is $H_n = \sum_{k=1}^n \frac{1}{k} \app
 ### Q5: How does the Dual-Fitting technique prove the $H_n$ approximation bound?
 **Answer:**  
 "Dual fitting works by using the Linear Programming dual of the Set Cover relaxation:
-1. When Greedy picks facility $i^*$ covering $\Delta U$ new elements, we assign each newly covered element a price $p(z) = c_{i^*} / |\Delta U|$. By definition, the sum of all prices equals the total greedy cost.
+1. When Greedy picks facility $i^\star$ covering $\Delta U$ new elements, we assign each newly covered element a price $p(z) = c_{i^\star} / |\Delta U|$. By definition, the sum of all prices equals the total greedy cost.
 2. For any candidate facility $S_k$, ordering its elements in reverse order of coverage proves that $\sum_{z \in S_k} p(z) \le c_k H_{|S_k|} \le c_k H_n$.
 3. Setting dual variables $y_j = p(z_j) / H_n$ makes the vector $y$ feasible for the Dual LP.
 4. By weak duality, any feasible dual solution is $\le C_{\text{OPT}}$. Thus, $\text{Cost}(\text{Greedy}) = H_n \sum y_j \le H_n \cdot C_{\text{OPT}}$."
@@ -481,8 +481,8 @@ In 1979, Chvátal proved the upper bound is $H_n = \sum_{k=1}^n \frac{1}{k} \app
 ### Q7: What are the specific pruning conditions in your Branch-and-Bound implementation?
 **Answer:**  
 "We implement three pruning rules:
-1. **Cost-Bound Pruning:** If $\text{current\_cost} \ge \text{best\_cost}$, prune the branch (because all costs $c_i > 0$, adding more facilities can only increase cost).
-2. **Reachability Pruning:** We precompute suffix bitmasks $\text{suffix\_union}[d] = \bigcup_{i=d}^{m-1} S_i$. If $(\text{current\_mask} \mid \text{suffix\_union}[d]) \neq \text{target\_mask}$, then even taking all remaining facilities cannot achieve 100% coverage. Prune immediately.
+1. **Cost-Bound Pruning:** If `current_cost >= best_cost`, prune the branch (because all costs $c_i > 0$, adding more facilities can only increase cost).
+2. **Reachability Pruning:** We precompute suffix bitmasks `suffix_union[d]` $= \bigcup_{i=d}^{m-1} S_i$. If `(current_mask | suffix_union[d]) != target_mask`, then even taking all remaining facilities cannot achieve 100% coverage. Prune immediately.
 3. **Feasibility Termination:** Once full coverage is achieved, record the cost and prune deeper inclusions."
 
 ---
@@ -490,7 +490,7 @@ In 1979, Chvátal proved the upper bound is $H_n = \sum_{k=1}^n \frac{1}{k} \app
 ### Q8: Why did you use integer bitmasks in the exact solvers?
 **Answer:**  
 "Performance. Instead of performing slow Python set unions (`set.union()`) or iterating through arrays of booleans, we represent coverage as binary integers. For $n$ demand zones, bit $j$ is 1 if covered, 0 otherwise. Checking full coverage is a single CPU instruction:
-$$\text{mask} == (1 \ll n) - 1$$
+`mask == (1 << n) - 1`
 Adding a facility is a bitwise OR (`mask | fac_mask`). This runs in nanoseconds and enables evaluating hundreds of thousands of combinations per second in pure Python without external C libraries."
 
 ---
@@ -523,7 +523,7 @@ This post-processing reduces costs by an additional 5–15% and increases the op
 ### Q12: How did you ensure 100% feasibility (universe coverability) during random generation?
 **Answer:**  
 "In function `_ensure_full_coverage` in `generator.py`:
-After generating random coordinates and radii, we compute the boolean coverage matrix. If any demand zone is uncovered, the algorithm finds the nearest facility, expands its radius to cover the zone plus a safety margin ($R_{i^*} = \text{dist} + 1.5$), and updates its cost. This guarantees $\bigcup S_i = U$ is always mathematically satisfied."
+After generating random coordinates and radii, we compute the boolean coverage matrix. If any demand zone is uncovered, the algorithm finds the nearest facility, expands its radius to cover the zone plus a safety margin ($R_{i^\star} = \mathrm{dist} + 1.5$), and updates its cost. This guarantees $\bigcup S_i = U$ is always mathematically satisfied."
 
 ---
 
