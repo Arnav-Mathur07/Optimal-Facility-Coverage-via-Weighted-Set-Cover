@@ -79,3 +79,11 @@ desktop.ini
 *.orig
 scratch/
 tmp/
+
+# --- Viva & Examination Cheat Sheets (Keep local only, do not push to public repo) ---
+*viva*
+*VIVA*
+*Viva*
+viva_questions*
+VIVA_QUESTIONS_AND_ANSWERS.md
+
