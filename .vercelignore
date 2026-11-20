@@ -1,0 +1,22 @@
+# Vercel deployment ignore
+# Prevents Vercel from attempting to build the Python Streamlit app as a Serverless function
+
+# Python server application files
+app.py
+src/
+tests/
+requirements.txt
+pytest.ini
+.streamlit/
+
+# Docker and PaaS manifests
+Dockerfile
+docker-compose.yml
+Procfile
+render.yaml
+
+# Development caches and artifacts
+__pycache__/
+.pytest_cache/
+shots/
+scratch/
